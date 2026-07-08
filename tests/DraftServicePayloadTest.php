@@ -43,4 +43,49 @@ class DraftServicePayloadTest extends TestCase
         ];
         $this->assertCount(1, DraftService::messagesFromRows($rows));
     }
+
+    public function testExtractsAmazonOrderNumberFromSubject(): void
+    {
+        $subject = 'Rueckfrage zur Lieferung (Bestellung: 028-4937770-4832355)';
+        $this->assertSame('028-4937770-4832355', DraftService::extractOrderNumber($subject, []));
+    }
+
+    public function testExtractsAmazonOrderNumberFromMessageBody(): void
+    {
+        $messages = [
+            ['author_type' => 'customer', 'date' => 'd', 'text' => 'Hi! Bestellnr.: 028-4937770-4832355 - ASIN: B0H2N6ZSY7'],
+        ];
+        $this->assertSame('028-4937770-4832355', DraftService::extractOrderNumber('Frage', $messages));
+    }
+
+    public function testExtractsLabelledOrderNumberWhenNoAmazonPattern(): void
+    {
+        $messages = [
+            ['author_type' => 'customer', 'date' => 'd', 'text' => 'Meine Bestellnr.: SHOP-10042 ist nicht angekommen.'],
+        ];
+        $this->assertSame('SHOP-10042', DraftService::extractOrderNumber('Frage', $messages));
+    }
+
+    public function testReturnsEmptyWhenNoOrderNumberPresent(): void
+    {
+        $messages = [
+            ['author_type' => 'customer', 'date' => 'd', 'text' => 'Wo bleibt mein Paket? Danke!'],
+        ];
+        $this->assertSame('', DraftService::extractOrderNumber('Lieferung', $messages));
+    }
+
+    public function testExtractsEbayUsername(): void
+    {
+        $messages = [
+            ['author_type' => 'customer', 'date' => 'd', 'text' => "Buyer's eBay Username: cool_buyer-99"],
+        ];
+        $this->assertSame('cool_buyer-99', DraftService::extractEbayUsername('Frage', $messages));
+    }
+
+    public function testReturnsEmptyWhenNoEbayUsername(): void
+    {
+        $this->assertSame('', DraftService::extractEbayUsername('Frage', [
+            ['author_type' => 'customer', 'date' => 'd', 'text' => 'Hallo, wo ist meine Bestellung?'],
+        ]));
+    }
 }

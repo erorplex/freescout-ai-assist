@@ -45,6 +45,52 @@ class DraftService
         return $messages;
     }
 
+    /**
+     * Best-effort order-number extraction from the ticket text. Sent to Flowkom
+     * as a resolution hint in connected mode — Flowkom matches it EXACTLY against
+     * real orders (order_number / external_order_id), so a wrong guess is
+     * harmless (it simply resolves nothing). Without this hint Flowkom can only
+     * fall back to the (often anonymized) customer email and the draft ends up
+     * ungrounded. Amazon order ids (3-7-7 digits) are matched first, then a
+     * labelled "Bestellnr./Bestellung/Order" token.
+     *
+     * @param array<int,array{author_type:string,date:string,text:string}> $messages
+     */
+    public static function extractOrderNumber(string $subject, array $messages): string
+    {
+        $text = $subject . "\n";
+        foreach ($messages as $m) {
+            $text .= (string) ($m['text'] ?? '') . "\n";
+        }
+        // 1. Amazon order id: 3-7-7 digits — very specific, no false positives.
+        if (preg_match('/\b\d{3}-\d{7}-\d{7}\b/', $text, $mm)) {
+            return $mm[0];
+        }
+        // 2. Labelled order number: "Bestellnr.:/Bestellnummer/Bestellung/Order #/..." + token.
+        if (preg_match('/(?:Bestell(?:nummer|nr|ung)|Order(?:\s*(?:#|Nr\.?|No\.?|Number))?)\.?\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9\-\/]{3,})/iu', $text, $mm)) {
+            return trim($mm[1], "-/");
+        }
+        return '';
+    }
+
+    /**
+     * eBay buyer username from the imported order-note line, if present. Sent as
+     * a Flowkom resolution hint for eBay tickets; empty when absent.
+     *
+     * @param array<int,array{author_type:string,date:string,text:string}> $messages
+     */
+    public static function extractEbayUsername(string $subject, array $messages): string
+    {
+        $text = $subject . "\n";
+        foreach ($messages as $m) {
+            $text .= (string) ($m['text'] ?? '') . "\n";
+        }
+        if (preg_match("/Buyer'?s eBay Username:\\s*([A-Za-z0-9_.\\-]+)/i", $text, $mm)) {
+            return $mm[1];
+        }
+        return '';
+    }
+
     // ---- FreeScout-side orchestration (not unit-tested; leans on tested pures) ----
 
     public static function registerButton(): void
@@ -170,13 +216,27 @@ class DraftService
 
         $email   = (string) ($conversation->customer_email ?? '');
         $channel = PromptBuilder::detectChannel($email);
+        $subject = mb_substr((string) $conversation->subject, 0, 490);
 
-        return [
-            'subject'        => mb_substr((string) $conversation->subject, 0, 490),
+        $ticket = [
+            'subject'        => $subject,
             'channel'        => $channel,
             'customer_email' => $email,
             'messages'       => $messages,
         ];
+        // Connected-mode resolution hints: only sent when found. Flowkom grounds
+        // the draft (order status, tracking, items) by matching these against
+        // real orders — without them the draft stays generic ("send me the
+        // order number"). Standalone mode ignores these fields.
+        $orderNumber = self::extractOrderNumber($subject, $messages);
+        if ($orderNumber !== '') {
+            $ticket['order_number'] = $orderNumber;
+        }
+        $ebayUsername = self::extractEbayUsername($subject, $messages);
+        if ($ebayUsername !== '') {
+            $ticket['ebay_username'] = $ebayUsername;
+        }
+        return $ticket;
     }
 
     private static function buildQuotedOriginal(array $ticket): ?string

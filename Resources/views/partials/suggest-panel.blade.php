@@ -27,18 +27,31 @@
     var ta = document.getElementById('aiassist-draft');
 
     function insertIntoReply(text) {
+        var $ = window.jQuery;
+        // HTML-escape the draft, keep line breaks (mirrors FreeScout's own
+        // reply-insert behaviour — the summernote editor takes HTML).
+        var box = document.createElement('div'); box.textContent = text;
+        var html = '<div>' + box.innerHTML.replace(/\n/g, '<br>') + '</div><br>';
+
+        // The editor is ready only when the summernote .note-editable is VISIBLE
+        // (i.e. the reply form is open). FreeScout's reply toggle is .conv-reply.
+        function insert() {
+            if (!$ || !$('#body').length || !$('.note-editable:visible').length) return false;
+            var cur = $('#body').summernote('code') || '';
+            $('#body').summernote('code', html + cur);
+            return true;
+        }
+        if (insert()) return;
+        // Reply form not open yet → open it, then retry until the editor mounts.
+        var replyBtn = document.querySelector('.conv-reply');
+        if (replyBtn) replyBtn.click();
         var tries = 0;
-        (function poll() {
-            var $body = window.jQuery ? window.jQuery('#body') : null;
-            if ($body && $body.length && $body.summernote) {
-                try { $body.summernote('pasteHTML', text.replace(/\n/g, '<br>')); return; } catch (e) {}
+        var iv = setInterval(function() {
+            if (insert() || ++tries > 20) {
+                clearInterval(iv);
+                if (tries > 20) { msg.textContent = 'Antwortformular nicht gefunden — bitte manuell kopieren.'; msg.style.display = 'block'; }
             }
-            // open the reply form if not mounted yet
-            var replyBtn = document.querySelector('.js-reply, #conv-reply, [data-toggle-reply]');
-            if (replyBtn && tries === 0) { replyBtn.click(); }
-            if (tries++ < 20) { setTimeout(poll, 250); }
-            else { msg.textContent = 'Antwortformular nicht gefunden — bitte manuell kopieren.'; msg.style.display = 'block'; }
-        })();
+        }, 250);
     }
 
     btn.addEventListener('click', function() {

@@ -2,7 +2,7 @@
     "name": "AiAssist",
     "alias": "aiassist",
     "description": "Guidance-first AI reply drafts for FreeScout. Standalone (BYOK, Claude/OpenAI via raw curl, no SDK) or optionally grounded via Flowkom. No auto-send: the human always edits and sends. Deterministic no-links / no-contact guardrails. DSGVO-first.",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "detailsUrl": "https://github.com/erorplex/freescout-ai-assist",
     "author": "erorplex",
     "authorUrl": "https://github.com/erorplex",
