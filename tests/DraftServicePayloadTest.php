@@ -88,4 +88,25 @@ class DraftServicePayloadTest extends TestCase
             ['author_type' => 'customer', 'date' => 'd', 'text' => 'Hallo, wo ist meine Bestellung?'],
         ]));
     }
+
+    public function testWithPerDraftInstructionAppendsToGlobalInstructions(): void
+    {
+        $g = ['version' => 1, 'global' => ['instructions' => 'Basis-Regel.'], 'channels' => []];
+        $out = DraftService::withPerDraftInstruction($g, 'Biete Ersatz an.');
+        $this->assertStringContainsString('Basis-Regel.', $out['global']['instructions']);
+        $this->assertStringContainsString('Zusätzliche Anweisung nur für diese Antwort: Biete Ersatz an.', $out['global']['instructions']);
+    }
+
+    public function testWithPerDraftInstructionEmptyIsNoOp(): void
+    {
+        $g = ['version' => 1, 'global' => ['instructions' => 'X'], 'channels' => []];
+        $this->assertSame($g, DraftService::withPerDraftInstruction($g, '   '));
+    }
+
+    public function testWithPerDraftInstructionSetsWhenNoBase(): void
+    {
+        $g = ['version' => 1, 'global' => ['instructions' => ''], 'channels' => []];
+        $out = DraftService::withPerDraftInstruction($g, 'Kurz halten.');
+        $this->assertSame('Zusätzliche Anweisung nur für diese Antwort: Kurz halten.', $out['global']['instructions']);
+    }
 }

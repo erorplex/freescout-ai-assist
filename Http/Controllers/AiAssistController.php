@@ -28,7 +28,12 @@ class AiAssistController extends Controller
                 return response()->json(['error' => 'Kein Zugriff auf dieses Ticket.'], 403);
             }
 
-            $result = DraftService::draft($conversation);
+            $result = DraftService::draft($conversation, [
+                // "grounding=off" = the "Ohne Daten" button (force standalone).
+                'force_standalone' => request('grounding') === 'off',
+                // Optional one-off instruction the agent typed for THIS draft.
+                'instruction'      => mb_substr((string) request('instruction', ''), 0, 1000),
+            ]);
             if (!empty($result['error']) || trim((string) $result['text']) === '') {
                 return response()->json(['error' => $result['error'] ?: 'Entwurf konnte nicht erstellt werden — bitte erneut versuchen.'], 422);
             }

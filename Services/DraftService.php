@@ -134,25 +134,68 @@ class DraftService
     }
 
     /**
+     * @param array{force_standalone?:bool,instruction?:string} $opts
      * @return array{text:string,source:string,error:?string}
      */
-    public static function draft($conversation): array
+    public static function draft($conversation, array $opts = []): array
     {
+        $instruction = trim((string) ($opts['instruction'] ?? ''));
         $mode = self::resolveMode();
+
+        // "Ohne Daten" (force_standalone) even in a connected setup: draft locally
+        // with the module's own key — this path never sends anything to Flowkom.
+        if (!empty($opts['force_standalone'])) {
+            if (Settings::apiKey() !== '' && Settings::dpaAcknowledged()) {
+                return self::draftStandalone($conversation, $instruction);
+            }
+            return ['text' => '', 'source' => 'standalone', 'error' => 'Der Modus „Ohne Daten" braucht einen eigenen KI-Schlüssel im Modul (Standalone-Anbieter) inkl. bestätigter DPA.'];
+        }
+
         if ($mode === 'connected') {
-            return self::draftConnected($conversation);
+            return self::draftConnected($conversation, $instruction);
         }
         if ($mode === 'standalone') {
-            return self::draftStandalone($conversation);
+            return self::draftStandalone($conversation, $instruction);
         }
         return ['text' => '', 'source' => $mode, 'error' => 'Kein KI-Anbieter konfiguriert oder DPA nicht bestätigt.'];
     }
 
-    private static function draftStandalone($conversation): array
+    /**
+     * Append a one-off, per-draft instruction to the compiled guidance's global
+     * instructions. Applies to standalone (local prompt) AND connected (flows to
+     * Flowkom via guidance.global.instructions). Pure; caps length.
+     */
+    public static function withPerDraftInstruction(array $guidance, string $instruction): array
+    {
+        $instruction = trim($instruction);
+        if ($instruction === '') {
+            return $guidance;
+        }
+        $instruction = mb_substr($instruction, 0, 1000);
+        $base = trim((string) ($guidance['global']['instructions'] ?? ''));
+        $line = 'Zusätzliche Anweisung nur für diese Antwort: ' . $instruction;
+        $guidance['global']['instructions'] = $base === '' ? $line : ($base . "\n" . $line);
+        return $guidance;
+    }
+
+    private static function customerFirstName($conversation): string
+    {
+        try {
+            $c = $conversation->customer ?? null;
+            if ($c && isset($c->first_name)) {
+                return trim((string) $c->first_name);
+            }
+        } catch (\Throwable $e) {
+            // customer not loadable -> no name substitution
+        }
+        return '';
+    }
+
+    private static function draftStandalone($conversation, string $instruction = ''): array
     {
         $ticket   = self::buildTicket($conversation);
         $channel  = $ticket['channel'];
-        $guidance = PromptBuilder::compileGuidance(Settings::guidanceSettings());
+        $guidance = self::withPerDraftInstruction(PromptBuilder::compileGuidance(Settings::guidanceSettings()), $instruction);
         $effective = PromptBuilder::resolve($guidance, $channel);
         $kb       = Settings::kbText() !== '' ? ['text' => Settings::kbText()] : null;
 
@@ -168,15 +211,15 @@ class DraftService
         }
 
         $quoted = (!empty($effective['quote_original'])) ? self::buildQuotedOriginal($ticket) : null;
-        $text = Postprocessor::apply($raw, $effective, Settings::signatureText(), $quoted);
+        $text = Postprocessor::apply($raw, $effective, Settings::signatureText(), $quoted, self::customerFirstName($conversation));
         return ['text' => $text, 'source' => 'standalone', 'error' => null];
     }
 
-    private static function draftConnected($conversation): array
+    private static function draftConnected($conversation, string $instruction = ''): array
     {
         $ticket    = self::buildTicket($conversation);
         $channel   = $ticket['channel'];
-        $guidance  = PromptBuilder::compileGuidance(Settings::guidanceSettings());
+        $guidance  = self::withPerDraftInstruction(PromptBuilder::compileGuidance(Settings::guidanceSettings()), $instruction);
         $effective = PromptBuilder::resolve($guidance, $channel);
         $kb        = Settings::kbText() !== '' ? ['text' => Settings::kbText()] : null;
 
@@ -191,7 +234,7 @@ class DraftService
 
         // Belt-and-suspenders: post-process again module-side before delivery.
         $quoted = (!empty($effective['quote_original'])) ? self::buildQuotedOriginal($ticket) : null;
-        $text = Postprocessor::apply($raw, $effective, Settings::signatureText(), $quoted);
+        $text = Postprocessor::apply($raw, $effective, Settings::signatureText(), $quoted, self::customerFirstName($conversation));
         return ['text' => $text, 'source' => 'connected', 'error' => null];
     }
 

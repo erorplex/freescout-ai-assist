@@ -100,9 +100,10 @@
     </div>
 
     <div class="form-group">
-        <label class="col-sm-3 control-label">{{ __('System-Instruktionen') }}</label>
+        <label class="col-sm-3 control-label">{{ __('Anweisungen an die KI') }}</label>
         <div class="col-sm-6">
-            <textarea class="form-control" name="settings[aiassist.system_instructions]" rows="4">{{ $settings['aiassist.system_instructions'] ?? '' }}</textarea>
+            <textarea class="form-control" name="settings[aiassist.system_instructions]" rows="7" placeholder="{{ __('Eine Regel pro Zeile — z. B.: Bei „nicht erhalten“ den Versandstatus nennen und Nachforschung anbieten; keine festen Liefertermine versprechen; freundlich und knapp.') }}">{{ $settings['aiassist.system_instructions'] ?? '' }}</textarea>
+            <p class="form-help">{{ __('Deine dauerhaften Vorgaben — gelten für JEDE KI-Antwort (mit und ohne Daten). Am besten eine Regel pro Zeile: Tonfall, Do’s & Don’ts, Standard-Formulierungen, was die KI NICHT versprechen darf. Je konkreter, desto besser die Entwürfe. Für einen einmaligen Hinweis gibt es im Ticket-Panel zusätzlich das Feld „Anweisung nur für diese Antwort“.') }}</p>
         </div>
     </div>
 
@@ -126,10 +127,10 @@
     </div>
 
     <div class="form-group">
-        <label class="col-sm-3 control-label">{{ __('Wissensbasis (KB)') }}</label>
+        <label class="col-sm-3 control-label">{{ __('Wissensbasis / Standardwissen') }}</label>
         <div class="col-sm-6">
-            <textarea class="form-control" name="settings[aiassist.kb_text]" rows="5" maxlength="6000">{{ $settings['aiassist.kb_text'] ?? '' }}</textarea>
-            <p class="form-help">{{ __('Standalone-Kontext (max. 6000 Zeichen), wird jedem Entwurf beigelegt.') }}</p>
+            <textarea class="form-control" name="settings[aiassist.kb_text]" rows="6" maxlength="6000" placeholder="{{ __('Fakten & Standardtexte — z. B.: Bearbeitungszeit 1–2 Werktage; Rücksendung innerhalb 30 Tagen; Versand mit DHL und Deutsche Post.') }}">{{ $settings['aiassist.kb_text'] ?? '' }}</textarea>
+            <p class="form-help">{{ __('Firmeninfos, FAQ, Standard-Antworten (max. 6000 Zeichen). Wird jedem Entwurf als Kontext mitgegeben — in beiden Modi (mit und ohne Daten). Hier „lernt“ die KI dein Geschäft.') }}</p>
         </div>
     </div>
 

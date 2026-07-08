@@ -67,4 +67,42 @@ class PostprocessorTest extends TestCase
         $this->assertStringContainsString('https://ebay.de/itm/1', $out);   // quote NOT stripped
         $this->assertStringContainsString('Urspruengliche Nachricht', $out);
     }
+
+    public function testNamePlaceholderResolvedToCustomerName(): void
+    {
+        $eff = ['links_policy' => 'allow', 'signature' => false];
+        $out = Postprocessor::apply('Hallo {{name}}, vielen Dank.', $eff, '', null, 'Sahra');
+        $this->assertSame('Hallo Sahra, vielen Dank.', $out);
+    }
+
+    public function testEmptyNameRemovesPlaceholderAndTidies(): void
+    {
+        $out = Postprocessor::resolvePlaceholders('Guten Tag {{name}}, alles gut.', '', false, false);
+        $this->assertSame('Guten Tag, alles gut.', $out);
+    }
+
+    public function testTrackingPlaceholderBecomesSafePhraseWhenLinksBlocked(): void
+    {
+        $out = Postprocessor::resolvePlaceholders('Ihre Sendung ist {{tracking_url}}.', '', true, false);
+        $this->assertStringContainsString('in Ihrem Kundenkonto einsehbar', $out);
+        $this->assertStringNotContainsString('{{', $out);
+        $this->assertStringNotContainsString('http', $out);
+        // "du" variant
+        $du = Postprocessor::resolvePlaceholders('Deine Sendung ist {{tracking_url}}.', '', true, true);
+        $this->assertStringContainsString('in deinem Kundenkonto einsehbar', $du);
+    }
+
+    public function testTrackingPlaceholderBecomesBracketWhenLinksAllowed(): void
+    {
+        $out = Postprocessor::resolvePlaceholders('Sendungsstatus: {{tracking_url}}', '', false, false);
+        $this->assertStringContainsString('[Sendungslink hier einfuegen]', $out);
+        $this->assertStringNotContainsString('{{', $out);
+    }
+
+    public function testStrayPlaceholderBecomesBracket(): void
+    {
+        $out = Postprocessor::resolvePlaceholders('Bezug: {{bestellnummer}} — danke.', '', false, false);
+        $this->assertStringContainsString('[bestellnummer]', $out);
+        $this->assertStringNotContainsString('{{', $out);
+    }
 }
