@@ -34,7 +34,11 @@ class AiAssistController extends Controller
             }
             return response()->json(['draft' => $result['text'], 'source' => $result['source']]);
         } catch (\Throwable $e) {
-            return response()->json(['error' => 'Entwurf konnte nicht erstellt werden — bitte erneut versuchen.'], 502);
+            // Surface the provider's error (e.g. "unsupported parameter", "model
+            // not found", rate limit) so the admin can act on it. It carries no
+            // key/prompt — the provider classes only throw the API's error text.
+            $m = trim($e->getMessage());
+            return response()->json(['error' => $m !== '' ? ('KI-Anbieter: ' . mb_substr($m, 0, 300)) : 'Entwurf konnte nicht erstellt werden — bitte erneut versuchen.'], 502);
         }
     }
 
@@ -50,7 +54,7 @@ class AiAssistController extends Controller
             if (Settings::provider() === 'openai') {
                 $res = $http->request('POST', 'https://api.openai.com/v1/chat/completions', [
                     'Authorization: Bearer ' . $key, 'content-type: application/json', 'accept: application/json',
-                ], ['model' => Settings::model(), 'messages' => [['role' => 'user', 'content' => 'ping']], 'max_tokens' => 1, 'store' => false], 10);
+                ], ['model' => Settings::model(), 'messages' => [['role' => 'user', 'content' => 'ping']], 'max_completion_tokens' => 5, 'store' => false], 10);
             } else {
                 $res = $http->request('POST', 'https://api.anthropic.com/v1/messages', [
                     'x-api-key: ' . $key, 'anthropic-version: 2023-06-01', 'content-type: application/json', 'accept: application/json',
@@ -60,13 +64,14 @@ class AiAssistController extends Controller
                 return response()->json(['success' => false, 'message' => 'Verbindungsfehler: ' . $res['transport_error']]);
             }
             $status = (int) ($res['status'] ?? 0);
-            if ($status === 401 || $status === 403) {
-                return response()->json(['success' => false, 'message' => 'API-Key ungültig (HTTP ' . $status . ').']);
-            }
-            if ($status >= 200 && $status < 500) {
+            // Only a 2xx is a real success. A 400 (wrong model / unsupported
+            // parameter) is a FAILURE — surface the provider's message so the
+            // admin can fix it instead of getting a false "successful" test.
+            if ($status >= 200 && $status < 300) {
                 return response()->json(['success' => true, 'message' => 'Verbindung erfolgreich (HTTP ' . $status . ').']);
             }
-            return response()->json(['success' => false, 'message' => 'Unerwarteter Status: HTTP ' . $status]);
+            $apiMsg = $res['json']['error']['message'] ?? ('HTTP ' . $status);
+            return response()->json(['success' => false, 'message' => 'Fehler (HTTP ' . $status . '): ' . mb_substr((string) $apiMsg, 0, 300)]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => 'Fehler: ' . $e->getMessage()]);
         }

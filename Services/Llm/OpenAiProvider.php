@@ -24,7 +24,10 @@ class OpenAiProvider implements AiProvider
             'model'       => $this->model,
             'messages'    => $withSystem,          // system folded into messages[0]
             'temperature' => $opts['temperature'] ?? 0.3,
-            'max_tokens'  => (int) ($opts['max_tokens'] ?? 1024),
+            // max_completion_tokens is the current OpenAI field. The legacy
+            // max_tokens is rejected by newer models (GPT-5, o-series) with
+            // HTTP 400 "unsupported parameter" and works on none of them.
+            'max_completion_tokens' => (int) ($opts['max_tokens'] ?? 1024),
             'store'       => false,
         ];
         $headers = [

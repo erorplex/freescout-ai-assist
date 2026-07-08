@@ -56,6 +56,11 @@ class ProviderRequestShapingTest extends TestCase
         $this->assertSame('SYS', $body['messages'][0]['content']);
         $this->assertSame('user', $body['messages'][1]['role']);
         $this->assertFalse($body['store']);
+        // GPT-5 / o-series reject the legacy max_tokens with HTTP 400 — the
+        // OpenAI request MUST use max_completion_tokens and never max_tokens.
+        $this->assertArrayHasKey('max_completion_tokens', $body);
+        $this->assertArrayNotHasKey('max_tokens', $body);
+        $this->assertSame(1024, $body['max_completion_tokens']);
         $this->assertStringContainsString('https://api.openai.com/v1/chat/completions', $http->lastRequest['url']);
     }
 
