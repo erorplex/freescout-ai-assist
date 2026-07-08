@@ -6,29 +6,29 @@
         <button type="button" disabled title="Kein KI-Anbieter konfiguriert / DPA nicht bestätigt"
             style="display:block;width:100%;text-align:center;padding:6px 0;border:0;border-radius:3px;font-size:11px;color:#fff;font-weight:500;background:#9ca3af;cursor:not-allowed;">Kein KI-Anbieter konfiguriert</button>
         @else
-        <textarea id="aiassist-instruction" rows="2" placeholder="Optional: Anweisung nur für diese Antwort (z. B. „kurz halten, Ersatz anbieten“)"
-            style="width:100%;box-sizing:border-box;font-size:11px;border:1px solid #d6dce2;border-radius:3px;padding:5px;margin-bottom:6px;"></textarea>
-        @if($connected)
-        <div style="display:flex;gap:6px;">
-            <button type="button" class="aiassist-suggest" data-grounding="on"
-                style="flex:1;text-align:center;padding:6px 0;border:0;border-radius:3px;font-size:11px;color:#fff;font-weight:500;background:#0f766e;cursor:pointer;">Mit Bestelldaten</button>
-            <button type="button" class="aiassist-suggest" data-grounding="off"
-                style="flex:1;text-align:center;padding:6px 0;border:1px solid #d6dce2;border-radius:3px;font-size:11px;color:#334155;font-weight:500;background:#fff;cursor:pointer;">Ohne Daten</button>
+        <div id="aiassist-input">
+            <textarea id="aiassist-instruction" rows="2" placeholder="Optional: Anweisung nur für diese Antwort (z. B. „kurz halten, Ersatz anbieten“)"
+                style="width:100%;box-sizing:border-box;font-size:11px;border:1px solid #d6dce2;border-radius:3px;padding:5px;margin-bottom:6px;"></textarea>
+            @if($connected)
+            <div style="display:flex;gap:6px;">
+                <button type="button" class="aiassist-suggest" data-grounding="on" style="flex:1;text-align:center;padding:6px 0;border:0;border-radius:3px;font-size:11px;color:#fff;font-weight:500;background:#0f766e;cursor:pointer;">Mit Bestelldaten</button>
+                <button type="button" class="aiassist-suggest" data-grounding="off" style="flex:1;text-align:center;padding:6px 0;border:1px solid #d6dce2;border-radius:3px;font-size:11px;color:#334155;font-weight:500;background:#fff;cursor:pointer;">Ohne Daten</button>
+            </div>
+            <p style="margin:5px 0 0;color:#6b7280;font-size:10px;">„Mit Bestelldaten“ erdet über Flowkom · Entwurf immer prüfen und selbst senden.</p>
+            @else
+            <button type="button" class="aiassist-suggest" data-grounding="on" style="display:block;width:100%;text-align:center;padding:6px 0;border:0;border-radius:3px;font-size:11px;color:#fff;font-weight:500;background:#0f766e;cursor:pointer;">Antwort vorschlagen</button>
+            <p style="margin:5px 0 0;color:#6b7280;font-size:10px;">Entwurf immer prüfen und selbst senden.</p>
+            @endif
         </div>
-        <p style="margin:5px 0 0;color:#6b7280;font-size:10px;">„Mit Bestelldaten“ erdet den Entwurf über Flowkom (Auftrags-/Versandstatus). „Ohne Daten“ antwortet allgemein.</p>
-        @else
-        <button type="button" class="aiassist-suggest" data-grounding="on"
-            style="display:block;width:100%;text-align:center;padding:6px 0;border:0;border-radius:3px;font-size:11px;color:#fff;font-weight:500;background:#0f766e;cursor:pointer;">Antwort vorschlagen</button>
         @endif
-        @endif
-        <p style="margin:6px 0 0;color:#6b7280;font-size:10px;">Entwurf für den Menschen — bitte prüfen, bearbeiten und selbst senden.</p>
         <div id="aiassist-msg" style="display:none;margin-top:6px;color:#c0392b;"></div>
         <div id="aiassist-draft-wrap" style="display:none;margin-top:8px;">
-            <textarea id="aiassist-draft" readonly style="width:100%;min-height:120px;font-size:12px;border:1px solid #d6dce2;border-radius:3px;padding:6px;"></textarea>
+            <textarea id="aiassist-draft" readonly style="width:100%;box-sizing:border-box;min-height:90px;max-height:220px;overflow-y:auto;resize:vertical;font-size:12px;border:1px solid #d6dce2;border-radius:3px;padding:6px;"></textarea>
             <p id="aiassist-hint" style="display:none;margin:5px 0 0;color:#b45309;font-size:10px;">Platzhalter in eckigen Klammern […] bitte noch ersetzen.</p>
             <div style="margin-top:6px;display:flex;gap:6px;">
                 <button type="button" id="aiassist-insert" style="flex:1;padding:5px 0;border:0;border-radius:3px;font-size:11px;color:#fff;background:#0f766e;cursor:pointer;">In Antwort einfügen</button>
                 <button type="button" id="aiassist-copy" style="flex:1;padding:5px 0;border:1px solid #d6dce2;border-radius:3px;font-size:11px;background:#fff;cursor:pointer;">Kopieren</button>
+                <button type="button" id="aiassist-dismiss" title="Entwurf verwerfen" style="padding:5px 10px;border:1px solid #d6dce2;border-radius:3px;font-size:11px;background:#fff;color:#64748b;cursor:pointer;">Verwerfen</button>
             </div>
         </div>
     </div>
@@ -41,6 +41,7 @@
     if (!panel || !buttons.length || panel.dataset.bound) return;
     panel.dataset.bound = '1';
     var url = panel.getAttribute('data-url');
+    var input = document.getElementById('aiassist-input');
     var msg = document.getElementById('aiassist-msg');
     var wrap = document.getElementById('aiassist-draft-wrap');
     var ta = document.getElementById('aiassist-draft');
@@ -73,9 +74,24 @@
         }, 250);
     }
 
-    function run(grounding, clicked) {
-        msg.style.display = 'none'; wrap.style.display = 'none';
+    // Show only the draft (hide the input controls) so the panel stays compact
+    // and doesn't push the panels below it out of the scroll area.
+    function showResult(draft) {
+        ta.value = draft;
+        if (input) input.style.display = 'none';
+        wrap.style.display = 'block';
+        if (hint) hint.style.display = draft.indexOf('[') !== -1 ? 'block' : 'none';
+    }
+    function showInput() {
+        wrap.style.display = 'none';
         if (hint) hint.style.display = 'none';
+        msg.style.display = 'none';
+        ta.value = '';
+        if (input) input.style.display = '';
+    }
+
+    function run(grounding, clicked) {
+        msg.style.display = 'none';
         buttons.forEach(function(b) { b.disabled = true; });
         var original = clicked.textContent; clicked.textContent = 'Wird erstellt…';
         var tokenEl = document.querySelector('meta[name=csrf-token]') || document.querySelector('input[name=_token]');
@@ -90,8 +106,7 @@
         .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
         .then(function(res) {
             if (res.ok && res.d && res.d.draft) {
-                ta.value = res.d.draft; wrap.style.display = 'block';
-                if (hint) hint.style.display = res.d.draft.indexOf('[') !== -1 ? 'block' : 'none';
+                showResult(res.d.draft);
             } else {
                 msg.textContent = (res.d && res.d.error) ? res.d.error : 'Entwurf konnte nicht erstellt werden — bitte erneut versuchen.';
                 msg.style.display = 'block';
@@ -106,6 +121,7 @@
     document.getElementById('aiassist-copy').addEventListener('click', function() {
         ta.select(); try { document.execCommand('copy'); } catch (e) {}
     });
+    document.getElementById('aiassist-dismiss').addEventListener('click', showInput);
 })();
 </script>
 @endif

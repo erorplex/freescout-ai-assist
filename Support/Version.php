@@ -4,5 +4,5 @@ namespace Modules\AiAssist\Support;
 
 class Version
 {
-    const MODULE = '0.2.0';
+    const MODULE = '0.2.1';
 }
