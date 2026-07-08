@@ -47,8 +47,8 @@ class PostprocessorTest extends TestCase
     public function testApplyAppendsSignatureWhenEnabled(): void
     {
         $eff = ['links_policy' => 'allow', 'signature' => true];
-        $out = Postprocessor::apply('Text.', $eff, "Ihr Team\nPixkom", null);
-        $this->assertSame("Text.\n\nIhr Team\nPixkom", $out);
+        $out = Postprocessor::apply('Text.', $eff, "Ihr Team\nMusterfirma", null);
+        $this->assertSame("Text.\n\nIhr Team\nMusterfirma", $out);
     }
 
     public function testApplyOmitsSignatureWhenDisabled(): void
