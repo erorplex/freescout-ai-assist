@@ -18,7 +18,36 @@ At `links_policy = block` (forced for eBay/Amazon) the server strips, in order: 
 
 ## Install
 
-Direct install (recommended first): download `AiAssist.zip` from [Releases](https://github.com/erorplex/freescout-ai-assist/releases/latest), unzip so a single `AiAssist/` folder lands in your FreeScout `Modules/` directory, then activate under **Modules**. FreeScout's one-click update then tracks new releases via `module.json`.
+FreeScout loads a module by finding its folder at `Modules/<Name>/` and, on activation, booting the module's service provider. So the **whole** `AiAssist/` folder must arrive intact — an incomplete upload (e.g. `module.json` transfers but the PHP class files do not) makes FreeScout throw `Class "Modules\AiAssist\Providers\AiAssistServiceProvider" not found` on every request. See [Troubleshooting](#troubleshooting--recovery) if that happens.
+
+**Recommended — extract on the server (avoids incomplete FTP transfers):**
+
+1. Download `AiAssist.zip` from the [latest release](https://github.com/erorplex/freescout-ai-assist/releases/latest).
+2. Upload the **ZIP file** to your server and **extract it server-side** — via your hosting control panel's file manager (all-inkl/KAS, Plesk, cPanel all have "Extract") or over SSH (`unzip AiAssist.zip -d /path/to/freescout/Modules/`). The result must be the folder `Modules/AiAssist/` (containing `module.json`, `Providers/`, `Services/`, …). Server-side extraction guarantees every one of the ~22 files arrives — plain FTP of many small files can silently drop some.
+3. In FreeScout open **Manage → Modules**, find **AiAssist**, and click **Activate**. If your install uses config caching, click **Clear Cache** (Manage → System → Tools) first.
+
+**If you can only use FTP:** unzip the archive **locally** first, then upload the entire `AiAssist/` folder into `Modules/`. Afterwards verify on the server that these exist and are non-empty **before** activating:
+
+- `Modules/AiAssist/module.json`
+- `Modules/AiAssist/Providers/AiAssistServiceProvider.php`
+- `Modules/AiAssist/Services/` (10 `.php` files) and `Modules/AiAssist/Http/Controllers/AiAssistController.php`
+
+Once installed, FreeScout's one-click update tracks new releases automatically via `module.json`.
+
+## Troubleshooting / Recovery
+
+**Symptom:** after activating, the helpdesk shows *"Whoops / Application error"* or a 500 on every page. The log (`storage/logs/laravel-YYYY-MM-DD.log`) shows `Class "Modules\AiAssist\Providers\AiAssistServiceProvider" not found`.
+
+**Cause:** the module folder is incomplete (the provider/class files were not uploaded fully).
+
+**Recovery — delete BOTH of these paths, then your helpdesk is immediately back:**
+
+1. `Modules/AiAssist/` — the module folder.
+2. `bootstrap/cache/ai_assist_module.php` — FreeScout's cached pointer to the module's provider.
+
+> ⚠️ Deleting only the folder is **not enough** — FreeScout keeps the cached provider reference in `bootstrap/cache/ai_assist_module.php` and will keep erroring (and can make it look "even more broken") until that file is removed too. Remove both, reload, and the helpdesk is healthy again.
+
+Then re-install completely (server-side extraction recommended).
 
 ## Data protection (DSGVO-first)
 
